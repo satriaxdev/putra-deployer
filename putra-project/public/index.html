@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUTRA PROJECT</title>
+<style>
+body { font-family:'Segoe UI', sans-serif; background:#000; color:#fff; text-align:center; padding:50px; overflow:hidden; position:relative; }
+input, button, select { margin:10px; padding:10px; border-radius:5px; border:none; font-size:16px; }
+button { cursor:pointer; background:#4caf50; color:white; }
+.result { margin-top:20px; word-break: break-all; }
+.token-list { margin-top: 20px; color: #ffeb3b; }
+#neonCanvas { position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1; }
+</style>
+</head>
+<body>
+<h1>PUTRA PROJECT</h1>
+<p>Upload folder ZIP dan deploy ke Vercel atau Netlify</p>
+
+<input type="file" id="folderInput" accept=".zip"><br>
+<select id="platform">
+  <option value="vercel">Vercel</option>
+  <option value="netlify">Netlify</option>
+</select><br>
+<input type="text" id="tokenInput" placeholder="Masukkan API Token"><br>
+<button onclick="saveToken()">Simpan Token</button>
+<button onclick="deployFolder()">Deploy</button>
+
+<div class="result" id="result"></div>
+<div class="token-list" id="tokenList"></div>
+<canvas id="neonCanvas"></canvas>
+
+<script>
+async function saveToken() {
+  const platform = document.getElementById('platform').value;
+  const token = document.getElementById('tokenInput').value;
+  if(!token) return alert("Token kosong!");
+  const res = await fetch("/save-token", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ platform, token }) });
+  const data = await res.json();
+  if(data.success){ alert(data.message); document.getElementById('tokenInput').value=""; showTokens(); }
+  else alert("Gagal menyimpan token!");
+}
+
+async function deployFolder() {
+  const fileInput = document.getElementById('folderInput');
+  const platform = document.getElementById('platform').value;
+  const result = document.getElementById('result');
+  if(!fileInput.files.length) return alert("Upload file ZIP terlebih dahulu!");
+  const formData = new FormData();
+  formData.append('folder', fileInput.files[0]);
+  formData.append('platform', platform);
+  result.innerHTML = "Sedang deploy...";
+  try {
+    const res = await fetch("/deploy", { method:"POST", body:formData });
+    const data = await res.json();
+    if(res.ok && data.success) result.innerHTML = `Berhasil deploy! <a href="${data.url}" target="_blank">${data.url}</a>`;
+    else result.innerHTML = "Gagal deploy: "+JSON.stringify(data);
+  } catch(err){ console.error(err); result.innerHTML = "Terjadi kesalahan: "+err.message; }
+}
+
+async function showTokens() {
+  const res = await fetch("/tokens");
+  const tokens = await res.json();
+  const listEl = document.getElementById('tokenList');
+  listEl.innerHTML = "<b>Token tersimpan:</b><br>" + Object.keys(tokens).join(", ");
+}
+showTokens();
+
+// Neon red bintik bergerak dramatis
+const canvas = document.getElementById("neonCanvas");
+const ctx = canvas.getContext("2d");
+let width = canvas.width = window.innerWidth;
+let height = canvas.height = window.innerHeight;
+const particles = [];
+const PARTICLE_COUNT = 200;
+for(let i=0;i<PARTICLE_COUNT;i++){
+  particles.push({
+    x: Math.random()*width,
+    y: Math.random()*height,
+    vx: (Math.random()-0.5)*1.2,
+    vy: (Math.random()-0.5)*1.2,
+    size: Math.random()*2+0.5,
+    alpha: Math.random()*0.7+0.3,
+    alphaChange: (Math.random()*0.02+0.005)*(Math.random()<0.5?1:-1)
+  });
+}
+window.addEventListener("resize",()=>{ width=canvas.width=window.innerWidth; height=canvas.height=window.innerHeight; });
+function animate() {
+  ctx.fillStyle="rgba(0,0,0,0.2)";
+  ctx.fillRect(0,0,width,height);
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0)p.x=width;if(p.x>width)p.x=0;
+    if(p.y<0)p.y=height;if(p.y>height)p.y=0;
+    p.alpha+=p.alphaChange;
+    if(p.alpha>0.9||p.alpha<0.2)p.alphaChange*=-1;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,0,0,${p.alpha})`;
+    ctx.shadowColor="red"; ctx.shadowBlur=20;
+    ctx.fill();
+  });
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
